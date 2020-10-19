@@ -1,0 +1,197 @@
+---
+- name: Install phpbb on a CentOS 8 machine
+  hosts: all
+
+  tasks:
+    - name: Fetch the variables from var file
+      include_vars:
+        file: ../vars/main.yml
+
+    - name: install epel-release
+      dnf:
+        name:
+          - epel-release
+        state: latest
+
+    - name: Ensure SELinux is set to disabled mode
+      lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=disabled'
+
+    - name: install the lamp stack
+      dnf:
+        name:
+          - php-mysqlnd 
+          - php-fpm 
+          - mariadb-server 
+          - httpd 
+          - tar 
+          - curl 
+          - php-json
+          - php-xml
+          - python3
+          - unzip
+        state: latest
+
+    - name: make sure pymysql is present
+      pip:
+        name: pymysql
+        state: present
+
+    - name: start httpd
+      service:
+        name: httpd
+        enabled: yes
+        state: started
+
+    - name: start mariadb
+      service:
+        name: mariadb
+        enabled: yes
+        state: started
+
+    - name: Set the root password 
+      mysql_user: 
+        login_user: root 
+        login_password: "" 
+        user: root 
+        password: "{{ mariadb_root_password }}"
+      ignore_errors: yes 
+    
+    - name: Secure the root user for IPV6 localhost (::1)
+      mysql_user: 
+        login_user: root 
+        login_password: "{{ mariadb_root_password }}" 
+        user: root 
+        password: "{{ mariadb_root_password }}" 
+        host: "::1"
+    
+    - name: Secure the root user for IPV4 localhost (127.0.0.1)
+      mysql_user: 
+        login_user: root 
+        login_password: "{{ mariadb_root_password }}" 
+        user: root 
+        password: "{{ mariadb_root_password }}" 
+        host: "127.0.0.1"
+    
+    - name: Secure the root user for localhost domain
+      mysql_user: 
+        login_user: root 
+        login_password: "{{ mariadb_root_password }}" 
+        user: root 
+        password: "{{ mariadb_root_password }}" 
+        host: "localhost"
+    
+    - name: Secure the root user for server_hostname domain
+      mysql_user: 
+        login_user: root 
+        login_password: "{{ mariadb_root_password }}" 
+        user: root 
+        password: "{{ mariadb_root_password }}" 
+        host: "{{ ansible_fqdn }}"
+    
+    - name: Deletes anonymous server user
+      mysql_user: 
+        login_user: root 
+        login_password: "{{ mariadb_root_password }}" 
+        user: "" 
+        host_all: yes 
+        state: absent
+    
+    - name: Create the phpbb db
+      mysql_db: 
+        login_user: root 
+        login_password: "{{ mariadb_root_password }}" 
+        db: "{{ phpbb_db }}"
+        state: present
+    
+    - name: Create phpbb user
+      mysql_user: 
+        login_user: root 
+        login_password: "{{ mariadb_root_password }}" 
+        user: "{{ phpbb_db_user }}"
+        password: "{{ phpbb_db_password }}"
+        priv: '*.*:ALL,GRANT'
+        state: present
+
+    - name: Removes the test database
+      mysql_db: 
+        login_user: root 
+        login_password: "{{ mariadb_root_password }}" 
+        db: test
+        state: absent
+
+    - name: pull the phpbb to the machine
+      unarchive:
+        src: https://download.phpbb.com/pub/release/3.3/{{ phpbb_version }}/phpBB-{{ phpbb_version }}.zip
+        dest: /var/www/html
+        remote_src: yes
+        creates: /var/www/html/phpBB3/
+
+    - name: pull down the markdown plugin
+      unarchive:
+        src: https://www.phpbb.com/customise/db/download/173626?sid=07bf352a8fe311467a03a4e6e1a9ad16
+        dest: /var/www/html/phpBB3/ext/
+        remote_src: yes
+
+    - name: move directory to webroot
+      shell:
+        cmd: mv /var/www/html/phpBB3/* /var/www/html/.
+        creates: /var/www/html/config.php
+
+    - name: move .htaccess to webroot
+      shell:
+        cmd: mv /var/www/html/phpBB3/.htaccess /var/www/html/.htaccess
+        creates: /var/www/html/.htaccess
+
+    - name: remove phpBB3 directory
+      shell:
+        cmd: rm -rf /var/www/html/phpBB3
+
+    - name: fixup cache directory
+      file:
+        path: /var/www/html/cache
+        mode: '0777'
+
+    - name: fixup store directory
+      file:
+        path: /var/www/html/store
+        mode: '0777'
+
+    - name: fixup files directory
+      file:
+        path: /var/www/html/files
+        mode: '0777'
+
+    - name: fixup images/avatars/upload directory
+      file:
+        path: /var/www/html/images/avatars/upload
+        mode: '0777'
+
+    - name: fixup config.php file
+      file:
+        path: /var/www/html/config.php
+        state: touch
+        mode: '0666'
+
+    - name: change ownership to apache
+      file:
+        path: /var/www/html
+        recurse: yes
+        owner: apache
+        group: apache
+
+    - name: restart httpd
+      service:
+        name: httpd
+        state: restarted
+
+    - name: stop and disable firewall
+      service:
+        name: firewalld
+        state: stopped
+        enabled: no
+
+    - name: reboot
+      reboot:

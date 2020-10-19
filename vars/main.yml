@@ -1,0 +1,8 @@
+---
+mariadb_root_password: 'P@assw0rd!'
+ansible_python_interperter: '/usr/bin/python3'
+phpbb_db: 'phpbb'
+phpbb_db_user: 'phpbb'
+phpbb_db_password: 'phpbb'
+phpbb_db_host: 'localhost'
+phpbb_version: '3.3.1'
