@@ -135,6 +135,24 @@
         dest: /var/www/html/phpBB3/ext/
         remote_src: yes
 
+    - name: pull down the 3rd-party embedded media plugin
+      unarchive:
+        src: https://www.phpbb.com/customise/db/download/182026
+        dest: /var/www/html/phpBB3/ext/
+        remote_src: yes
+
+    - name: pull down the board rules extention
+      unarchive:
+        src: https://www.phpbb.com/customise/db/download/172261
+        dest: /var/www/html/phpBB3/ext/
+        remote_src: yes
+
+    - name: pull down the board announcements extention
+      unarchive:
+        src: https://www.phpbb.com/customise/db/download/157976
+        dest: /var/www/html/phpBB3/ext/
+        remote_src: yes
+
     - name: move directory to webroot
       shell:
         cmd: mv /var/www/html/phpBB3/* /var/www/html/.
